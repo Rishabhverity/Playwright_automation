@@ -1,97 +1,135 @@
-# Playwright Login Automation
+# Learning Level Validator
 
-A static **frontend** (Next.js) + separate **backend** (Express + Playwright) for automating website logins, saving sessions per user, and running tasks on saved sessions.
+A small standalone FastAPI service that validates learning levels (K1–K6) and returns their Bloom's taxonomy meaning.
 
-## Architecture
+## Learning Levels
 
-```
-frontend/   → Static Next.js UI (port 3000)
-backend/    → Express API + Playwright (port 4000)
-```
+| Level | Meaning    |
+|-------|------------|
+| K1    | Remember   |
+| K2    | Understand |
+| K3    | Apply      |
+| K4    | Analyze    |
+| K5    | Evaluate   |
+| K6    | Create     |
 
-The frontend calls the backend via `NEXT_PUBLIC_API_URL`.
+## Setup
 
-## Prerequisites
+1. Create and activate a virtual environment (recommended):
 
-- Node.js 18+
-- Chrome (for headed Playwright automation)
+   ```bash
+   python -m venv venv
 
-## 1. Start the backend
+   # Windows
+   venv\Scripts\activate
+
+   # macOS / Linux
+   source venv/bin/activate
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Run the Service
+
+From the `learning-level-validator` directory:
 
 ```bash
-cd backend
-npm install
-npx playwright install chromium
-npm run dev
+python -m uvicorn app.main:app --reload
 ```
 
-`npm run dev` automatically frees port 4000 if an old server is still running.
+On Windows, if `uvicorn` or `pytest` is not recognized, always use `python -m` (as shown above) instead of calling them directly.
 
-The API runs at **http://localhost:4000**.
+The API will be available at `http://127.0.0.1:8000`.
 
-> **Note:** If you are already inside the `backend` folder, run `npm run dev` only — do not run `cd backend` again.
+Interactive docs: `http://127.0.0.1:8000/docs`
 
-## 2. Start the frontend
+## API
 
-In a second terminal:
+### POST /validate-learning-level
+
+**Request:**
+
+```json
+{
+  "level": "K3"
+}
+```
+
+**Success response (valid level):**
+
+```json
+{
+  "valid": true,
+  "level": "K3",
+  "meaning": "Apply",
+  "flags": [],
+  "recommendations": []
+}
+```
+
+**Response (invalid level):**
+
+```json
+{
+  "valid": false,
+  "level": "Beginner",
+  "meaning": null,
+  "flags": ["invalid_learning_level"],
+  "recommendations": ["Use one of K1, K2, K3, K4, K5, K6."]
+}
+```
+
+**Validation error (empty level):**
+
+Sending an empty `level` returns HTTP `422` with a Pydantic validation error.
+
+### Sample curl requests
+
+Valid level:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+curl -X POST http://127.0.0.1:8000/validate-learning-level \
+  -H "Content-Type: application/json" \
+  -d "{\"level\": \"K3\"}"
 ```
 
-The UI runs at **http://localhost:3000**.
+Invalid level:
 
-## Environment variables
-
-**frontend/.env.local**
-```
-NEXT_PUBLIC_API_URL=http://localhost:4000
-```
-
-**backend/.env**
-```
-PORT=4000
-AUTH_SECRET=dev-secret-change-in-production
-```
-
-## Production build
-
-**Frontend (static export):**
 ```bash
-cd frontend
-npm run build
+curl -X POST http://127.0.0.1:8000/validate-learning-level \
+  -H "Content-Type: application/json" \
+  -d "{\"level\": \"Beginner\"}"
 ```
-Output is in `frontend/out/` — deploy to any static host (Netlify, GitHub Pages, S3, etc.).
 
-**Backend:**
+## Run Tests
+
+From the `learning-level-validator` directory:
+
 ```bash
-cd backend
-npm run build
-npm start
+python -m pytest
 ```
-Deploy the backend to any Node host (Railway, Render, VPS). Set `NEXT_PUBLIC_API_URL` on the frontend to your API URL.
 
-**Session limits (backend `.env`):**
-- `SESSION_TTL_HOURS=5` — auto-delete sessions after 5 hours (from last use)
+Run with verbose output:
 
-**Sessions API pagination:** `GET /sessions?page=1&pageSize=5`
+```bash
+python -m pytest -v
+```
 
-## API routes
+## Project Structure
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/auth/signup` | Create account |
-| POST | `/auth/login` | Sign in |
-| POST | `/auth/logout` | Sign out |
-| GET | `/auth/me` | Current user |
-| GET | `/sessions` | List saved site sessions |
-| POST | `/automate-login` | Automate login + save session |
-| POST | `/automate-task` | Run task on a saved session |
-
-## Usage
-
-1. Sign up / sign in on the frontend
-2. **Automate login** — enter a site URL + credentials; session is saved on the backend
-3. **Run a task** — e.g. `search cars`, pick a saved session, run
+```
+learning-level-validator/
+  app/
+    __init__.py
+    main.py
+    schemas.py
+    validator.py
+  tests/
+    test_validator.py
+  requirements.txt
+  README.md
+```
