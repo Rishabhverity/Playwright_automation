@@ -33,3 +33,9 @@ backend/data/
 
 # compiled backend output
 backend/dist/
+
+# python (learning-level-validator)
+learning-level-validator/venv/
+learning-level-validator/.pytest_cache/
+**/__pycache__/
+*.pyc
