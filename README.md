@@ -13,20 +13,19 @@ A small standalone FastAPI service that validates whether a generated learning u
 ## Project Structure
 
 ```
-learning-unit-quality-checker/
-  app/
-    __init__.py
-    main.py
-    schemas.py
-    quality_checker.py
-  tests/
-    test_quality_checker.py
-  sample_inputs/
-    valid_learning_unit.json
-    warning_learning_unit.json
-    invalid_learning_unit.json
-  requirements.txt
-  README.md
+app/
+  __init__.py
+  main.py
+  schemas.py
+  quality_checker.py
+tests/
+  test_quality_checker.py
+sample_inputs/
+  valid_learning_unit.json
+  warning_learning_unit.json
+  invalid_learning_unit.json
+requirements.txt
+README.md
 ```
 
 ## Setup
@@ -49,7 +48,7 @@ pip install -r requirements.txt
 
 ## Run the Service
 
-From the `learning-unit-quality-checker` directory:
+From the project root:
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
