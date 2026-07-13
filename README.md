@@ -1,97 +1,173 @@
-# Playwright Login Automation
+# Learning Unit Quality Checker
 
-A static **frontend** (Next.js) + separate **backend** (Express + Playwright) for automating website logins, saving sessions per user, and running tasks on saved sessions.
+A small standalone FastAPI service that validates whether a generated learning unit is complete, clear, and review-ready.
 
-## Architecture
+## Features
+
+- Single POST endpoint for quality validation
+- Rule-based checks for title, concept, level, outcome, duration, and source locator
+- Severity levels: `pass`, `warning`, and `error`
+- Quality score from 0–100 based on errors and warnings
+- Pytest test suite
+
+## Project Structure
 
 ```
-frontend/   → Static Next.js UI (port 3000)
-backend/    → Express API + Playwright (port 4000)
+learning-unit-quality-checker/
+  app/
+    __init__.py
+    main.py
+    schemas.py
+    quality_checker.py
+  tests/
+    test_quality_checker.py
+  sample_inputs/
+    valid_learning_unit.json
+    warning_learning_unit.json
+    invalid_learning_unit.json
+  requirements.txt
+  README.md
 ```
 
-The frontend calls the backend via `NEXT_PUBLIC_API_URL`.
+## Setup
 
-## Prerequisites
-
-- Node.js 18+
-- Chrome (for headed Playwright automation)
-
-## 1. Start the backend
+1. Create and activate a virtual environment (recommended):
 
 ```bash
-cd backend
-npm install
-npx playwright install chromium
-npm run dev
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
 ```
 
-`npm run dev` automatically frees port 4000 if an old server is still running.
-
-The API runs at **http://localhost:4000**.
-
-> **Note:** If you are already inside the `backend` folder, run `npm run dev` only — do not run `cd backend` again.
-
-## 2. Start the frontend
-
-In a second terminal:
+2. Install dependencies:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+pip install -r requirements.txt
 ```
 
-The UI runs at **http://localhost:3000**.
+## Run the Service
 
-## Environment variables
+From the `learning-unit-quality-checker` directory:
 
-**frontend/.env.local**
-```
-NEXT_PUBLIC_API_URL=http://localhost:4000
-```
-
-**backend/.env**
-```
-PORT=4000
-AUTH_SECRET=dev-secret-change-in-production
-```
-
-## Production build
-
-**Frontend (static export):**
 ```bash
-cd frontend
-npm run build
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-Output is in `frontend/out/` — deploy to any static host (Netlify, GitHub Pages, S3, etc.).
 
-**Backend:**
+The API will be available at `http://127.0.0.1:8000`.
+
+Interactive docs: `http://127.0.0.1:8000/docs`
+
+## Sample Request
+
+**POST** `/check-learning-unit-quality`
+
+```json
+{
+  "unit_id": "unit-001",
+  "title": "Explain AI in daily life",
+  "concept": "AI in daily life",
+  "level": "K2",
+  "outcome": "Explain the role of AI in daily life using common examples.",
+  "estimated_minutes": 15,
+  "source_locator": "pages 2-4",
+  "validation_flags": []
+}
+```
+
+**Success response:**
+
+```json
+{
+  "valid": true,
+  "severity": "pass",
+  "quality_score": 100,
+  "flags": [],
+  "recommendations": []
+}
+```
+
+## Warning Example
+
+Sample input: `sample_inputs/warning_learning_unit.json`
+
+```json
+{
+  "unit_id": "unit-002",
+  "title": "AI in daily life",
+  "concept": "AI in daily life",
+  "level": "K2",
+  "outcome": "Explain the role of AI in daily life using common examples.",
+  "estimated_minutes": 22,
+  "source_locator": null,
+  "validation_flags": []
+}
+```
+
+**Response:**
+
+```json
+{
+  "valid": true,
+  "severity": "warning",
+  "quality_score": 70,
+  "flags": [
+    "title_missing_action_verb",
+    "duration_outside_target_range",
+    "missing_source_locator"
+  ],
+  "recommendations": [
+    "Start the title with an action verb such as Explain, Describe, Identify, Apply, Analyze, Compare, Design, Evaluate, or Create.",
+    "Recommended duration is between 10 and 20 minutes.",
+    "Add a source locator such as page number or section reference."
+  ]
+}
+```
+
+## Validation Rules
+
+| Rule | Type |
+|------|------|
+| Title is required | Error |
+| Concept is required | Error |
+| Level is required and must be K1–K6 | Error |
+| Outcome is required and at least 20 characters | Error |
+| Estimated minutes is required | Error |
+| Duration below 5 or above 25 minutes | Error |
+| Duration outside 10–20 minutes | Warning |
+| Source locator missing | Warning |
+| Title should start with an action verb | Warning |
+| Concept longer than 80 characters | Warning |
+| Outcome same as title | Warning |
+| Existing `validation_flags` are carried forward | Warning |
+
+## Severity and Scoring
+
+- **Error:** `valid=false`, `severity=error`
+- **Warning only:** `valid=true`, `severity=warning`
+- **No issues:** `valid=true`, `severity=pass`
+
+Quality score starts at 100:
+
+- −30 points per error
+- −10 points per warning
+- Minimum score is 0
+
+## Run Tests
+
 ```bash
-cd backend
-npm run build
-npm start
+pytest -v
 ```
-Deploy the backend to any Node host (Railway, Render, VPS). Set `NEXT_PUBLIC_API_URL` on the frontend to your API URL.
 
-**Session limits (backend `.env`):**
-- `SESSION_TTL_HOURS=5` — auto-delete sessions after 5 hours (from last use)
+## Health Check
 
-**Sessions API pagination:** `GET /sessions?page=1&pageSize=5`
+**GET** `/health` returns `{"status": "ok"}`.
 
-## API routes
+## cURL Example
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/auth/signup` | Create account |
-| POST | `/auth/login` | Sign in |
-| POST | `/auth/logout` | Sign out |
-| GET | `/auth/me` | Current user |
-| GET | `/sessions` | List saved site sessions |
-| POST | `/automate-login` | Automate login + save session |
-| POST | `/automate-task` | Run task on a saved session |
-
-## Usage
-
-1. Sign up / sign in on the frontend
-2. **Automate login** — enter a site URL + credentials; session is saved on the backend
-3. **Run a task** — e.g. `search cars`, pick a saved session, run
+```bash
+curl -X POST "http://127.0.0.1:8000/check-learning-unit-quality" \
+  -H "Content-Type: application/json" \
+  -d @sample_inputs/valid_learning_unit.json
+```
